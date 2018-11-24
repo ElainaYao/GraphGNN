@@ -95,12 +95,17 @@ def train(gnn, logger, gen, args, iters=None):
     print ('Avg train inbalance', np.mean(inb_lst))
     return loss_lst, acc_lst, inb_lst
 
-def test_single(gnn, logger, W, it, args):
+def test_single(gnn, logger, gen, it, args):
     start = time.time()
     WW, x, WW_lg, y, P = gen.sample_batch()
     pred = gnn(WW, x, WW_lg, y, P)
-    acc, inb = compute_loss_acc(pred, args, WW) 
-
+    L = WW[:,:,:,1] - WW[:,:,:,2]
+    del WW
+    del WW_lg
+    del x
+    del y
+    del P
+    acc, inb = compute_loss_acc(pred, args, L) 
     elapsed = time.time() - start
 
     if(torch.cuda.is_available()):
@@ -113,15 +118,9 @@ def test_single(gnn, logger, W, it, args):
     print(template1.format(*info))
     print(template2.format(*out))
 
-    del WW
-    del WW_lg
-    del x
-    del y
-    del P
-
     return acc_value, inb
 
-def test(gnn, loger, W_all, args, iters = None):
+def test(gnn, logger, W_all, args, iters = None):
     if iters is None:
         iters = args.num_examples_test
         
@@ -137,8 +136,6 @@ def test(gnn, loger, W_all, args, iters = None):
     print ('Avg test acc', np.mean(acc_lst))
     print ('Avg test inb', np.mean(inb_lst))
     return acc_lst, inb_lst
-
-
 
 def read_args_commandline():
     parser = argparse.ArgumentParser()
@@ -241,7 +238,7 @@ def main():
             #   data = pickle.load(f)
     elif (args.mode == 'train'):           
         print ('Creating the gnn ...')
-        filename = 'lgnn_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_num' + str(args.num_examples_train)
+        filename = 'lgnn_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
         path_plus_name = os.path.join(args.path_gnn, filename)
         gnn = lGNN_multiclass(args.num_features, args.num_layers, args.J + 2, args.num_classes)
     
@@ -260,7 +257,7 @@ def main():
             'acc': acc,
             'inb': inb
         }
-        resname = 'res_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_num' + str(args.num_examples_train) + '.pickle'
+        resname = 'Segm_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
         path_plus_name = os.path.join(args.path_output, resname)
         print ('Saving loss, acc, inb ' + resname)
         with open(path_plus_name, 'wb') as f:

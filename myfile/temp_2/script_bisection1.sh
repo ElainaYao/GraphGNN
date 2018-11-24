@@ -35,14 +35,14 @@
 
 source activate py36
 python3 main.py \
---path_logger '/Users/Rebecca_yao/Documents/RESEARCH/Graph/myfile/temp_2/' \
---path_gnn '/Users/Rebecca_yao/Documents/RESEARCH/Graph/myfile/temp_2/output/' \
---path_output '/Users/Rebecca_yao/Documents/RESEARCH/Graph/myfile/temp_2/output/' \
+--path_logger '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/' \
+--path_gnn '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/' \
+--path_output '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/' \
 --filename_existing_gnn '' \
 --generative_model 'ErdosRenyi' \
 --num_examples_train 10 \
 --num_examples_test 1000 \
---num_ysampling 10000\
+--num_ysampling 10000 \
 --loss_method 'policy' \
 --num_nodes 50 \
 --edge_density 0.5 \
@@ -58,11 +58,16 @@ python3 main.py \
 --num_classes 2 \
 --lr 0.004
 
+module purge
+module load python/intel/3.7
+
+source activate py36
+python3 main.py \
 
 #!/bin/bash
 #SBATCH --job-name=try
-#SBATCH --output=/scratch/wy635/output/try.out
-#SBATCH --error=/scratch/wy635/output/try.err
+#SBATCH --output=/scratch/jss2/output/try.out
+#SBATCH --error=/scratch/jss2/output/try.err
 #SBATCH --time=00:05:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
@@ -70,19 +75,21 @@ python3 main.py \
 #SBATCH --mem=4GB
 
 module purge
-module load python/intel/2.7.12
+module load python3/intel/3.6.3
+source /home/jss2/pytorch/py3.6.3/bin/activate
 
-cd /home/wy635/Graph/temp_2/
-python3 main.py \
+cd /home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/
+python main.py \
 
---path_logger '/home/wy635/Graph/temp_2/' \
---path_gnn '/scratch/wy635/data-out/Graph/' \
---path_output '/scratch/wy635/data-out/Graph/' \
+--path_logger '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/' \
+--path_gnn '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
+--path_output '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --filename_existing_gnn '' \
 --generative_model 'ErdosRenyi' \
---num_examples_train 10 \
+--num_examples_train 1000 \
 --num_examples_test 1000 \
---loss_method 1 \
+--loss_method 'policy' \
+--num_ysampling 100000 \
 --num_nodes 50 \
 --edge_density 0.5 \
 --Lambda 10 \
