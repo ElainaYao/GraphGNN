@@ -1,0 +1,13 @@
+# Don't track content of these folders
+littlethinking/
+__pycache__/
+
+# Compiled source #
+###################
+*.pickle
+*.png
+*.ipynb
+*.txt
+*lgnn_*
+*.pdf
+
