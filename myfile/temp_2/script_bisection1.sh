@@ -82,7 +82,6 @@ python3 main.py \
 --generative_model 'ErdosRenyi' \
 --num_examples_train 10 \
 --num_examples_test 1000 \
---num_iters_aggre 5 \
 --loss_method 1 \
 --num_nodes 50 \
 --edge_density 0.5 \

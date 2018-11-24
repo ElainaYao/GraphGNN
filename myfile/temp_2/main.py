@@ -38,12 +38,18 @@ def train_single(gnn, optimizer, logger, gen, Lambda, it, args):
     start = time.time()
     WW, x, WW_lg, y, P = gen.sample_batch()
     pred = gnn(WW, x, WW_lg, y, P)
+    L = WW[:,:,:,1] - WW[:,:,:,2]
+    del WW
+    del WW_lg
+    del x
+    del y
+    del P
     if args.loss_method == 'relaxation':
-        loss = compute_loss_rlx(pred, args, WW, Lambda)
-        acc, inb = compute_loss_acc(pred, args, WW) 
+        loss = compute_loss_rlx(pred, args, L, Lambda)
+        acc, inb = compute_loss_acc(pred, args, L) 
 
     elif args.loss_method == 'policy':
-        loss, acc, inb = compute_loss_policy(pred, args, WW, Lambda)
+        loss, acc, inb = compute_loss_policy(pred, args, L, Lambda)
 
     gnn.zero_grad()
     loss.backward()
@@ -65,11 +71,7 @@ def train_single(gnn, optimizer, logger, gen, Lambda, it, args):
     out = [it, loss_value, acc_value, abs(inb), Lambda, args.edge_density, elapsed]
     print(template1.format(*info))
     print(template2.format(*out))
-    del WW
-    del WW_lg
-    del x
-    del y
-    del P
+
 
     return loss_value, acc_value, inb
 

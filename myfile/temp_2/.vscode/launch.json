@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File (Integrated Terminal)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--path_logger", "/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/",
+                "--path_gnn", "/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/",
+                "--path_output", "/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/",
+                "--num_examples_train", "10",
+                "--num_examples_test", "100",
+                "--generative_model", "ErdosRenyi",
+                "--num_nodes", "50",
+                "--loss_method", "policy",
+                "--LambdaIncRate", "0.05",
+                "--num_ysampling","10000", 
+                "--edge_density", "0.5",
+                "--Lambda", "10",
+                "--LambdaIncRate", "0.05",
+                "--batch_size", "1",
+                "--mode", "train",
+                "--clip_grad_norm", "40.0",
+                "--num_features", "10",
+                "--num_layers", "30",
+                "--J", "2",
+                "--print_freq", "1",
+                "--num_classes", "2",
+                "--lr", "0.004"
+            ]   
+        }
+    ]
+}
