@@ -72,7 +72,7 @@ class Generator(object):
         d = W.sum(1)
         D = torch.diag(d)
     
-        Wnew = torch.zeros([n, n, self.J])
+        Wnew = torch.zeros([n, n, self.J]).type(self.dtype)
         for j in range(self.J):
             Wnew[:, :, j] = W
             W = torch.min(torch.mm(W, W), torch.ones([n, n]).type(self.dtype))
@@ -100,7 +100,7 @@ class Generator(object):
 
     def get_Pd(self, W):
         n = W.shape[0]
-        W = W * (torch.ones([n, n]) - torch.eye(n))
+        W = W * (torch.ones([n, n]).type(self.dtype) - torch.eye(n).type(self.dtype))
         M = int(W.sum())
         p = 0
         Pd = torch.zeros([n, M * 2])
@@ -186,7 +186,6 @@ if __name__ == '__main__':
     # execute only if run as a script
     ################### Test graph generators ########################
     gen = Generator()
-    gen.bs = 1000
     WW, x, WW_lg, y, P = gen.sample_batch()
     L = WW[:,:,:,1] - WW[:,:,:,2]
     L = L.numpy()
