@@ -238,12 +238,13 @@ def main():
             #   data = pickle.load(f)
     elif (args.mode == 'train'):           
         print ('Creating the gnn ...')
-        filename = 'lgnn_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
+        filename = 'lgnn_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
         path_plus_name = os.path.join(args.path_gnn, filename)
         gnn = lGNN_multiclass(args.num_features, args.num_layers, args.J + 2, args.num_classes)
     
         if torch.cuda.is_available():
                 gnn.cuda()
+
         print ('Training begins')
         loss, acc, inb = train(gnn, logger, gen, args, iters = None)
         print ('Saving gnn ' + filename)
@@ -257,7 +258,7 @@ def main():
             'acc': acc,
             'inb': inb
         }
-        resname = 'Segm_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
+        resname = 'Segm_' + str(args.loss_method) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
         path_plus_name = os.path.join(args.path_output, resname)
         print ('Saving loss, acc, inb ' + resname)
         with open(path_plus_name, 'wb') as f:

@@ -24,6 +24,7 @@ for test_i = 1:num_test
     res(test_i) = SDP_maxbis(W,Y,num_rounding);
 end
 %% save files
+path_output = '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/SDP/output/';
 file_name = sprintf('res_%s_N%d_p%0.1f_num%d.mat', generative_model, N, p, num_test);
 path_plus_name = fullfile(path_output, file_name);
 save(path_plus_name, 'res');

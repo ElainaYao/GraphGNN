@@ -33,7 +33,7 @@ class Generator(object):
             self.J = 3
             self.generative_model = "ErdosRenyi"
             self.bs = 1
-            self.path_output = '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/'
+            self.path_output = '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/'
         else:
             self.p = args.edge_density
             self.N = args.num_nodes
@@ -77,14 +77,14 @@ class Generator(object):
             Wnew[:, :, j] = W
             W = torch.min(torch.mm(W, W), torch.ones([n, n]).type(self.dtype))
         
-        WWtemp = torch.stack((torch.eye(n), D), dim = -1)
+        WWtemp = torch.stack((torch.eye(n).type(self.dtype), D), dim = -1)
         WWres = torch.cat((WWtemp, Wnew), dim = -1)
         x = torch.reshape(d, [n, 1])
         return WWres, x
 
     def get_Pm(self, W):
         n = W.shape[0]
-        W = W * (torch.ones([n, n]) - torch.eye(n))
+        W = W * (torch.ones([n, n]).type(self.dtype) - torch.eye(n).type(self.dtype))
         M = int(W.sum())
         p = 0
         Pm = torch.zeros([n, M * 2])
@@ -180,14 +180,14 @@ class Generator(object):
         WW_lg = torch.stack([element['WW_lg'] for element in batch_i])
         y = torch.stack([element['y'] for element in batch_i])
         P = torch.stack([element['P'] for element in batch_i])
-        return WW, x#, WW_lg, y, P
+        return WW, x, WW_lg, y, P
 
 if __name__ == '__main__':
     # execute only if run as a script
     ################### Test graph generators ########################
     gen = Generator()
     gen.bs = 1000
-    WW, x = gen.sample_batch()
+    WW, x, WW_lg, y, P = gen.sample_batch()
     L = WW[:,:,:,1] - WW[:,:,:,2]
     L = L.numpy()
     resname = 'testdata_' + str(gen.generative_model) + '_N' + str(gen.N) + '_p' + str(gen.p) + '_num' + str(gen.bs)

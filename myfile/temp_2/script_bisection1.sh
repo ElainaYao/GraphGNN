@@ -80,16 +80,15 @@ source /home/jss2/pytorch/py3.6.3/bin/activate
 
 cd /home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/
 python main.py \
-
 --path_logger '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/' \
 --path_gnn '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --path_output '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --filename_existing_gnn '' \
 --generative_model 'ErdosRenyi' \
---num_examples_train 1000 \
+--num_examples_train 10 \
 --num_examples_test 1000 \
 --loss_method 'policy' \
---num_ysampling 100000 \
+--num_ysampling 10 \
 --num_nodes 50 \
 --edge_density 0.5 \
 --Lambda 10 \
