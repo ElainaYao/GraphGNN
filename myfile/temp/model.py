@@ -46,8 +46,8 @@ def GMul(W, x):
 class gnn_atomic_lg(nn.Module):
     def __init__(self, feature_maps, J):
         super(gnn_atomic_lg, self).__init__()
-        self.num_inputs = J*feature_maps[0]
-        self.num_inputs_2 = 2 * feature_maps[1]
+        self.num_inputs = J*feature_maps[0]     
+        self.num_inputs_2 = 2 * feature_maps[1] 
         # self.num_inputs_3 = 4 * feature_maps[2]
         self.num_outputs = feature_maps[2]
         self.fcx2x_1 = nn.Linear(self.num_inputs, self.num_outputs // 2)
@@ -64,20 +64,22 @@ class gnn_atomic_lg(nn.Module):
     def forward(self, WW, x, WW_lg, y, P):
         # print ('W size', W.size())
         # print ('x size', input[1].size())
-        x2x = GMul(WW, x) # out has size (bs, N, num_inputs)
+        x2x = GMul(WW, x) # x, Dx, Wx, W^2x, ..., W^{j-1}x 
+        # x2x of size (bs, N, num_inputs) with num_inputs = J*feature_maps[0] = J
         x2x_size = x2x.size()
-        # print (x_size)
         x2x = x2x.contiguous()
-        x2x = x2x.view(-1, self.num_inputs)
-        # print (x.size()) 
-        # print ('x2x', x2x)
+        x2x = x2x.view(-1, self.num_inputs) 
+        # x2x of size (bs x N, num_inputs) with num_inputs = J*feature_maps[0] = J
         x2x = x2x.type(dtype)
 
-        # y2x = torch.bmm(P, y)
-        y2x = GMul(P, y)
+        y2x = GMul(P, y) # {Pm, Pd}y
+        # y of size (bs, 2|E|, b_k)
+        # P of size (bs, N, 2|E|, 2)
+        # y2x of size (bs, N, 2) 
         y2x_size = y2x.size()
         y2x = y2x.contiguous()
         y2x = y2x.view(-1, self.num_inputs_2)
+        # y2x of size (bs x N, 2)
 
         y2x = y2x.type(dtype)
 
@@ -125,8 +127,8 @@ class gnn_atomic_lg(nn.Module):
 class gnn_atomic_lg_final(nn.Module):
     def __init__(self, feature_maps, J, num_classes):
         super(gnn_atomic_lg_final, self).__init__()
-        self.num_inputs = J*feature_maps[0]
-        self.num_inputs_2 = 2 * feature_maps[1]
+        self.num_inputs = J*feature_maps[0] 
+        self.num_inputs_2 = 2 * feature_maps[1] 
         self.num_outputs = num_classes
         self.fcx2x_1 = nn.Linear(self.num_inputs, self.num_outputs)
         self.fcy2x_1 = nn.Linear(self.num_inputs_2, self.num_outputs)

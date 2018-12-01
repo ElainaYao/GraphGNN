@@ -17,95 +17,98 @@ from torch.nn import init
 from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
+from torch.distributions.categorical import Categorical 
 
-softmax = nn.Softmax(dim=1)
-
+softmax = nn.Softmax(dim = -1) # pred of size bs x N x 2 or N x 2
 if torch.cuda.is_available():
     dtype = torch.cuda.FloatTensor
     dtype_l = torch.cuda.LongTensor
-    # torch.cuda.manual_seed(0)
+
 else:
     dtype = torch.FloatTensor
     dtype_l = torch.LongTensor
 
-def compute_loss_rlx(pred, WW, Lambda):
-    loss = 0
-    if (torch.cuda.is_available()):
-        batch_size = pred.data.cpu().shape[0]
+def compute_loss_rlx(pred, args, L, Lambda):
+    L = L.type(dtype)
+    pred_prob = softmax(pred).type(dtype) # pred of size bs x N x 2
+    pp = pred_prob[:, :, 0] # pp of size bs x N
+    yy = 2*pp-1
+    c = 1/4 * torch.bmm(yy.unsqueeze(-2), torch.bmm(L, yy.unsqueeze(-1))) 
+    if args.problem == 'max':
+        loss = torch.mean(- c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
     else:
-        batch_size = pred.data.shape[0]
-    N = pred.data.shape[1]
-    for i in range(batch_size):
-        W = WW.type(dtype)[i,:,:,2]
-        D = WW.type(dtype)[i,:,:,1]
-        L = D - W
-        pred_single = pred[i, :, :]
-        pred_prob_single = softmax(pred_single) # check pred_prob_single.sum(dim = 1)
-        pp = pred_prob_single[:, 0] # or 1, same since we only have two classes and the loss is symmetric
+        loss = torch.mean(c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
 
-        loss_single = 1/4 * torch.dot(2*pp-1, torch.mv(L, 2*pp-1)) + Lambda * torch.norm(pp.sum()-N/2).pow(2)
-        #loss_single = 1/4 * torch.dot(2*pp-1, torch.mv(L, 2*pp-1)) + Lambda*torch.norm(labels_single_t.sum()).pow(2)
-        loss += loss_single
-    # no need to further average, it is just a normalizing constant
-    # avg_loss = loss/batch_size
     return loss
 
-def compute_loss_acc(pred, WW):   
-    if (torch.cuda.is_available()):
-        batch_size = pred.data.cpu().shape[0]
-    else:
-        batch_size = pred.data.shape[0]
-    acc = 0
-    inb = 0
-    for i in range(batch_size):
-        W = WW.type(dtype)[i,:,:,2]
-        D = WW.type(dtype)[i,:,:,1]
-        L = D - W
-        pred_single = pred[i, :, :]
-        pred_prob_single = softmax(pred_single) # check pred_prob_single.sum(dim = 1)
-        labels_single = torch.argmax(pred_prob_single, dim = 1) * 2 - 1
-        labels_single_t = torch.tensor(labels_single).type(dtype)
-        acc_single = 1/4 * torch.dot(labels_single_t, torch.mv(L, labels_single_t))
-        inb_single = torch.sum(labels_single_t)
-        acc += acc_single
-        inb += inb_single
-    # no need to further average, it is just a normalizing constant
-    #avg_acc = acc/batch_size  
-    #avg_inb = inb/batch_size
+def compute_loss_acc(pred, args, L):  
+    L = L.type(dtype)
+    labels = torch.argmax(pred, dim = -1).type(dtype) * 2 - 1 # of size bs x N
+    acc = torch.mean(1/4 * torch.bmm(labels.unsqueeze(-2), torch.bmm(L, labels.unsqueeze(-1))))
+    inb = torch.mean(torch.abs(labels.sum(dim = -1)))
     return acc, inb
 
-
-def compute_loss_acc_weighted(pred, WW, Lambda):   
-    if (torch.cuda.is_available()):
-        batch_size = pred.data.cpu().shape[0]
-    else:
-        batch_size = pred.data.shape[0]
-    loss_weighted = 0
-    acc = 0
-    inb = 0
-    for i in range(batch_size):
-        W = WW.type(dtype)[i,:,:,2]
-        D = WW.type(dtype)[i,:,:,1]
-        L = D - W
-        pred_single = pred[i, :, :]
-        pred_prob_single = softmax(pred_single) # check pred_prob_single.sum(dim = 1)
-        labels_single = torch.argmax(pred_prob_single, dim = 1) * 2 - 1
-        labels_single_t = torch.tensor(labels_single).type(dtype)
-        weight_single = torch.cumprod(torch.max(pred_prob_single, dim = 1)[0], dim = 0)[-1]
-        #print(weight_single)
-        acc_single = 1/4 * torch.dot(labels_single_t, torch.mv(L, labels_single_t))
-        inb_single = torch.sum(labels_single_t)     
-        loss_single_weighted = (acc_single + torch.norm(inb_single).pow(2)) * weight_single * Lambda # weighted by llh
+def compute_loss_policy(pred, args, L, Lambda): 
+    L = L.type(dtype)
+    pred_prob = softmax(pred).type(dtype)  # pred of size bs x N x 2
+    if args.batch_size == 1:
+        m = Categorical(pred_prob[0,:,:])
+        y_sampled = m.sample((args.num_ysampling,)).type(dtype)
+        #  y of size: args.num_ysampling x N
+        pred_prob_sampled_log = m.log_prob(y_sampled).type(dtype)
+        # of size: args.num_ysampling x N
+        pred_prob_sampled_sum_log = pred_prob_sampled_log.sum(dim = -1) 
+        # of size args.num_ysampling
+        y_sampled_label = y_sampled * 2 - 1
+        #  y of size: args.num_ysampling x N
+        L = L.squeeze(0).type(dtype)
+        #  L of size: N x N
+        c = torch.mm(y_sampled_label, torch.mm(L, torch.t(y_sampled_label)))
+        c = 1/4 * torch.diagonal(c, offset = 0) 
+        # c of size args.num_ysampling
+        if args.problem == 'max':
+            c_plus_penalty = - c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+        else:
+            c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+        loss = pred_prob_sampled_sum_log.dot(c_plus_penalty)
+        w = torch.exp(pred_prob_sampled_sum_log)/torch.exp(pred_prob_sampled_sum_log).sum(dim = -1)
+        acc = w.dot(c)
+        inb = torch.dot(torch.abs(y_sampled_label.sum(dim = 1)), w)
         
-        loss_weighted += loss_single_weighted
-        acc += acc_single
-        inb += torch.abs(inb_single)
-    # no need to further average for the weighted version, it is just a normalizing constant
-    # for nonweighted version, to print as output
-    avg_loss_weighted = loss_weighted/batch_size
-    avg_acc = acc/batch_size  
-    avg_inb = inb/batch_size
-    return avg_loss_weighted, avg_acc, avg_inb
+    else:
+        m = Categorical(pred_prob)
+        y_sampled = m.sample((args.num_ysampling,)).type(dtype)
+        # y_sampled of size: args.num_ysampling x bs x N
+        pred_prob_sampled_log = m.log_prob(y_sampled) 
+        # of size: args.num_ysampling x bs x N
+        y_sampled = y_sampled.permute(1,2,0)
+        # y_sampled of size: bs x N x args.num_ysampling
+        pred_prob_sampled_sum_log = pred_prob_sampled_log.sum(dim = -1).permute(1,0)
+        # of size args.num_ysampling x bs -> bs x args.num_ysampling
+        y_sampled_label = y_sampled * 2 - 1
+        c = torch.bmm(y_sampled_label.permute(0,2,1), torch.bmm(L, y_sampled_label))
+        # c of size bs x args.num_ysampling x args.num_ysampling
+        c = 1/4 * torch.diagonal(c, offset = 0, dim1 = -2, dim2 = -1) 
+        c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+        # c_plus_penalty of size bs x args.num_ysampling
+        loss = torch.bmm(c_plus_penalty.view([args.batch_size, 1, args.num_ysampling]), pred_prob_sampled_sum_log.view([args.batch_size, args.num_ysampling, 1]))
+        # loss of size bs
+        loss = torch.mean(loss)
+        w = torch.exp(pred_prob_sampled_sum_log)/torch.exp(pred_prob_sampled_sum_log).sum(dim = -1).view([args.batch_size, 1])
+        acc = torch.dot(c.view([args.batch_size, 1, args.num_ysampling]), w.view([args.batch_size, args.num_ysampling, 1]))
+        inb = torch.dot(torch.abs(y_sampled_label.sum(dim=1)).view([args.batch_size, 1, args.num_ysampling]), w.view([args.batch_size, args.num_ysampling, 1]))
+        acc = torch.mean(acc)
+        inb = torch.mean(inb)
+    inb = torch.round(inb)
+    return loss, acc, inb
+
+
+
+
+    
+
+
+
 
  
 

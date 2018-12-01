@@ -95,16 +95,11 @@ def get_lg_inputs(W, J):
     # torch.tensor() always copies data. If you have a Tensor data and want to avoid a copy, 
     # use torch.Tensor.requires_grad_() or torch.Tensor.detach(). 
     # If you have a NumPy ndarray and want to avoid a copy, use torch.from_numpy().
-#    WW = Variable(torch.from_numpy(WW).unsqueeze(0), volatile=False)
-#    x = Variable(torch.from_numpy(x).unsqueeze(0), volatile=False)
-#    WW_lg = Variable(torch.from_numpy(WW_lg).unsqueeze(0), volatile=False)
-#    y = Variable(torch.from_numpy(y).unsqueeze(0), volatile=False)
-#    P = Variable(torch.from_numpy(P).unsqueeze(0), volatile=False)
-    WW = torch.from_numpy(WW).unsqueeze(0)
-    x = torch.from_numpy(x).unsqueeze(0)
-    WW_lg = torch.from_numpy(WW_lg).unsqueeze(0)
-    y = torch.from_numpy(y).unsqueeze(0)
-    P = torch.from_numpy(P).unsqueeze(0)
+    WW = Variable(torch.from_numpy(WW).unsqueeze(0), volatile=False)
+    x = Variable(torch.from_numpy(x).unsqueeze(0), volatile=False)
+    WW_lg = Variable(torch.from_numpy(WW_lg).unsqueeze(0), volatile=False)
+    y = Variable(torch.from_numpy(y).unsqueeze(0), volatile=False)
+    P = Variable(torch.from_numpy(P).unsqueeze(0), volatile=False)
     return WW, x, WW_lg, y, P
 
 
