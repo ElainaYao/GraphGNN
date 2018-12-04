@@ -117,8 +117,8 @@ class Generator(object):
             for j in range(i+1, n):
                 if (W[i][j]==1):
                     Pd[i][p] = 1
-                    Pd[j][p] = 1
-                    Pd[i][p + M] = 1
+                    Pd[j][p] = -1
+                    Pd[i][p + M] = -1
                     Pd[j][p + M] = 1
                     p += 1
         Pd = Pd.type(self.dtype)
