@@ -17,11 +17,13 @@ python main.py \
 --path_gnn '/home/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --path_output '/home/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --filename_existing_gnn '' \
---generative_model 'ErdosRenyi' \
+--generative_model 'RegularGraph' \
+--problem 'max' \
+--problem0 'Cut' \
 --num_examples_train 1000 \
 --num_examples_test 1000 \
---loss_method 'relaxation' \
 --num_ysampling 10 \
+--loss_method 'relaxation' \
 --num_nodes 50 \
 --edge_density 0.5 \
 --Lambda 10 \
@@ -49,6 +51,7 @@ python3 main.py \
 --num_ysampling 10000 \
 --loss_method 'relaxation' \
 --problem 'max' \
+--problem0 'Cut' \
 --num_nodes 50 \
 --edge_density 0.5 \
 --Lambda 10 \

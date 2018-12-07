@@ -34,11 +34,19 @@ def compute_loss_rlx(pred, args, L, Lambda):
     pp = pred_prob[:, :, 0] # pp of size bs x N
     yy = 2*pp-1
     c = 1/4 * torch.bmm(yy.unsqueeze(-2), torch.bmm(L, yy.unsqueeze(-1))) 
-    if args.problem == 'max':
-        loss = torch.mean(- c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
+    if args.problem0 == 'Bisection':
+        if args.problem == 'max':
+            loss = torch.mean(- c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
+        else:
+            loss = torch.mean(c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
+    elif args.problem0 == 'Cut':
+        if args.problem == 'max':
+            loss = torch.mean(- c.view([args.batch_size]))
+        else:
+            loss = torch.mean(c.view([args.batch_size]))
     else:
-        loss = torch.mean(c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
-
+        raise ValueError('problem0 {} not supported'
+                             .format(args.problem0))
     return loss
 
 def compute_loss_acc(pred, args, L):  
@@ -66,15 +74,23 @@ def compute_loss_policy(pred, args, L, Lambda):
         c = torch.mm(y_sampled_label, torch.mm(L, torch.t(y_sampled_label)))
         c = 1/4 * torch.diagonal(c, offset = 0) 
         # c of size args.num_ysampling
-        if args.problem == 'max':
-            c_plus_penalty = - c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+        if args.problem0 == 'Bisection':
+            if args.problem == 'max':
+                c_plus_penalty = - c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+            else:
+                c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+        elif args.problem0 == 'Cut':
+            if args.problem == 'max':
+                c_plus_penalty = - c
+            else:
+                c_plus_penalty = c
         else:
-            c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
+            raise ValueError('problem0 {} not supported'
+                             .format(args.problem0))
         loss = pred_prob_sampled_sum_log.dot(c_plus_penalty)
         w = torch.exp(pred_prob_sampled_sum_log)/torch.exp(pred_prob_sampled_sum_log).sum(dim = -1)
         acc = w.dot(c)
         inb = torch.dot(torch.abs(y_sampled_label.sum(dim = 1)), w)
-        
     else:
         m = Categorical(pred_prob)
         y_sampled = m.sample((args.num_ysampling,)).type(dtype)

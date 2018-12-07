@@ -178,7 +178,7 @@ def read_args_commandline():
     parser.add_argument('--LambdaIncRate', nargs='?', const=1, type=float, default=0.05)
     parser.add_argument('--num_ysampling', nargs='?', const=1, type=int, default=10000)
     parser.add_argument('--problem', nargs='?', const=1, type=str, default='max')
-
+    parser.add_argument('--problem0', nargs='?', const=1, type=str, default='Cut')
     ###############################################################################
     #                                 GNN Settings                                #
     ###############################################################################
@@ -275,8 +275,6 @@ def main():
         print ('Saving loss, acc, inb, lastIDX...' + resname)
         with open(path_plus_name, 'wb') as f:
             pickle.dump(res, f, pickle.HIGHEST_PROTOCOL)
-
-
 
 if __name__ == '__main__':
     main()

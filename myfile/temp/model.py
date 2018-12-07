@@ -21,26 +21,31 @@ if torch.cuda.is_available():
     dtype = torch.cuda.FloatTensor
     dtype_l = torch.cuda.LongTensor
 else:
-    dtype = torch.FloatTensor                      # why FloatTensor??
+    dtype = torch.FloatTensor                      
     dtype_l = torch.cuda.LongTensor
 
 ######## need to go back and write my own 
 def GMul(W, x):
-    # x is a tensor of size (batch_size, N, num_features), where num_features is the b_k
-    # W is a tensor of size (batch_size, N, N, J), where J is the number of hop
-    x_size = x.size()
+    # x is a tensor of size (bs, N, num_features)
+    # W is a tensor of size (bs, N, N, J)
+    # x_size = x.size()
     # print (x)
     W_size = W.size()
-    # print (W)
     N = W_size[-3]
     J = W_size[-1]
-    W = W.split(1, 3)
-    W = torch.cat(W, 1).squeeze(3) # W is now a tensor of size (bs, J*N, N)
-    output = torch.bmm(W, x) # output has size (bs, J*N, num_features)
+    W_lst = W.split(1, 3)
+    # print (len(W_lst))
+    if N > 5000:
+        output_lst = []
+        for W in W_lst:
+            output_lst.append(torch.bmm(W.squeeze(3),x))
+        output = torch.cat(output_lst, 1)
+    else:
+        W = torch.cat(W_lst, 1).squeeze(3) # W is now a tensor of size (bs, J*N, N)
+        output = torch.bmm(W, x) # output has size (bs, J*N, num_features)
     output = output.split(N, 1)
     output = torch.cat(output, 2) # output has size (bs, N, J*num_features)
     return output
-
 
 ######## need to go back and write my own
 class gnn_atomic_lg(nn.Module):
