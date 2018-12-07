@@ -46,90 +46,78 @@ def GMul(W, x):
 class gnn_atomic_lg(nn.Module):
     def __init__(self, feature_maps, J):
         super(gnn_atomic_lg, self).__init__()
-        self.num_inputs = J*feature_maps[0]     
-        self.num_inputs_2 = 2 * feature_maps[1] 
-        # self.num_inputs_3 = 4 * feature_maps[2]
-        self.num_outputs = feature_maps[2]
-        self.fcx2x_1 = nn.Linear(self.num_inputs, self.num_outputs // 2)
-        self.fcy2x_1 = nn.Linear(self.num_inputs_2, self.num_outputs // 2)
-        self.fcx2x_2 = nn.Linear(self.num_inputs, self.num_outputs - self.num_outputs // 2)
-        self.fcy2x_2 = nn.Linear(self.num_inputs_2, self.num_outputs - self.num_outputs // 2)
-        self.fcx2y_1 = nn.Linear(self.num_inputs_2, self.num_outputs // 2)
-        self.fcy2y_1 = nn.Linear(self.num_inputs, self.num_outputs // 2)
-        self.fcx2y_2 = nn.Linear(self.num_inputs_2, self.num_outputs - self.num_outputs // 2)
-        self.fcy2y_2 = nn.Linear(self.num_inputs, self.num_outputs - self.num_outputs // 2)
-        self.bn2d_x = nn.BatchNorm2d(self.num_outputs)
-        self.bn2d_y = nn.BatchNorm2d(self.num_outputs)
+        self.feature_maps = feature_maps
+        self.J = J
+        self.fcx2x_1 = nn.Linear(J * feature_maps[0], feature_maps[2])
+        self.fcy2x_1 = nn.Linear(2 * feature_maps[1], feature_maps[2])
+        self.fcx2x_2 = nn.Linear(J * feature_maps[0], feature_maps[2])
+        self.fcy2x_2 = nn.Linear(2 * feature_maps[1], feature_maps[2])
+        self.fcx2y_1 = nn.Linear(J * feature_maps[1], feature_maps[2])
+        self.fcy2y_1 = nn.Linear(4 * feature_maps[2], feature_maps[2])
+        self.fcx2y_2 = nn.Linear(J * feature_maps[1], feature_maps[2])
+        self.fcy2y_2 = nn.Linear(4 * feature_maps[2], feature_maps[2])
+        self.bn2d_x = nn.BatchNorm2d(2 * feature_maps[2])
+        self.bn2d_y = nn.BatchNorm2d(2 * feature_maps[2])
 
     def forward(self, WW, x, WW_lg, y, P):
-        # print ('W size', W.size())
-        # print ('x size', input[1].size())
-        x2x = GMul(WW, x) # x, Dx, Wx, W^2x, ..., W^{j-1}x 
-        # x2x of size (bs, N, num_inputs) with num_inputs = J*feature_maps[0] = J
-        x2x_size = x2x.size()
-        x2x = x2x.contiguous()
-        x2x = x2x.view(-1, self.num_inputs) 
-        # x2x of size (bs x N, num_inputs) with num_inputs = J*feature_maps[0] = J
-        x2x = x2x.type(dtype)
+        xa1 = GMul(WW, x) # out has size (bs, N, num_inputs)
+        xa1_size = xa1.size()
+        xa1 = xa1.contiguous()
+        # print ('xa1', xa1.shape)
+        # print ('J', self.J)
+        # print ('fm0', self.feature_maps[0])
+        xa1 = xa1.view(-1, self.J * self.feature_maps[0])
+        # print (x.size()) 
+        # print ('x2x', x2x)
+        # xa1 = xa1.type(dtype)
 
-        y2x = GMul(P, y) # {Pm, Pd}y
-        # y of size (bs, 2|E|, b_k)
-        # P of size (bs, N, 2|E|, 2)
-        # y2x of size (bs, N, 2) 
-        y2x_size = y2x.size()
-        y2x = y2x.contiguous()
-        y2x = y2x.view(-1, self.num_inputs_2)
-        # y2x of size (bs x N, 2)
+        xb1 = GMul(P, y)
+        # xb1 = xb1.size()
+        xb1 = xb1.contiguous()
+        # print ('xb1', xb1.shape)
+        xb1 = xb1.view(-1, 2 * self.feature_maps[1])
 
-        y2x = y2x.type(dtype)
+        z1 = F.relu(self.fcx2x_1(xa1) + self.fcy2x_1(xb1)) # has size (bs*N, num_outputs)
 
-        # xy2x = x2x + y2x 
-        xy2x = F.relu(self.fcx2x_1(x2x) + self.fcy2x_1(y2x)) # has size (bs*N, num_outputs)
+        yl1 = self.fcx2x_2(xa1) + self.fcy2x_2(xb1)
+        zb1 = torch.cat((yl1, z1), 1)
+        zc1 = self.bn2d_x(zb1.unsqueeze(2).unsqueeze(3)).squeeze(3).squeeze(2)
+        # print ('zc1', zc1.shape)
+        zc1 = zc1.view(*xa1_size[:-1], 2 * self.feature_maps[2])
+        # print ('zc1', zc1.shape)
+        x_output = zc1
 
-        xy2x_l = self.fcx2x_2(x2x) + self.fcy2x_2(y2x)
-        x_cat = torch.cat((xy2x, xy2x_l), 1)
-        # x_output = self.bn2d_x(x_cat)
-        x_output = self.bn2d_x(x_cat.unsqueeze(2).unsqueeze(3)).squeeze(3).squeeze(2)
+        xda1 = GMul(WW_lg, y)
+        xda1_size = xda1.size()
+        xda1 = xda1.contiguous()
+        # print ('xda1', xda1.shape)
+        xda1 = xda1.view(-1, self.J * self.feature_maps[1])
 
-        x_output = x_output.view(*x2x_size[:-1], self.num_outputs)
+        xdb1 = GMul(torch.transpose(P, 2, 1), zc1)
+        # xdb1_size = xdb1.size()
+        xdb1 = xdb1.contiguous()
+        # print ('xdb1', xdb1.shape)
+        xdb1 = xdb1.view(-1, 4 * self.feature_maps[2])
 
+        zd1 = F.relu(self.fcx2y_1(xda1) + self.fcy2y_1(xdb1))
 
-        y2y = GMul(WW_lg, y)
-        y2y_size = y2y.size()
-        y2y = y2y.contiguous()
-        y2y = y2y.view(-1, self.num_inputs)
+        ydl1 = self.fcx2y_2(xda1) + self.fcy2y_2(xdb1)
 
-        y2y = y2y.type(dtype)
-
-        # x2y = torch.bmm(torch.t(P), x)
-        x2y = GMul(torch.transpose(P, 2, 1), x)
-        x2y_size = x2y.size()
-        x2y = x2y.contiguous()
-        x2y = x2y.view(-1, self.num_inputs_2)
-
-        x2y = x2y.type(dtype)
-
-        # xy2y = x2y + y2y
-        xy2y = F.relu(self.fcx2y_1(x2y) + self.fcy2y_1(y2y))
-
-        xy2y_l = self.fcx2y_2(x2y) + self.fcy2y_2(y2y)
-
-        y_cat = torch.cat((xy2y, xy2y_l), 1)
+        zdb1 = torch.cat((ydl1, zd1), 1)
         # y_output = self.bn2d_x(y_cat)
-        y_output = self.bn2d_y(y_cat.unsqueeze(2).unsqueeze(3)).squeeze(3).squeeze(2)
+        zdc1 = self.bn2d_y(zdb1.unsqueeze(2).unsqueeze(3)).squeeze(3).squeeze(2)
 
-        y_output = y_output.view(*y2y_size[:-1], self.num_outputs)
-
-        # WW = WW.type(dtype)
-
+        # print ('zdc1', zdc1.shape)
+        zdc1 = zdc1.view(*xda1_size[:-1], 2 * self.feature_maps[2])
+        y_output = zdc1
         return WW, x_output, WW_lg, y_output, P
 
 class gnn_atomic_lg_final(nn.Module):
-    def __init__(self, feature_maps, J, num_classes):
+    def __init__(self, feature_maps, J, n_classes):
         super(gnn_atomic_lg_final, self).__init__()
-        self.num_inputs = J*feature_maps[0] 
-        self.num_inputs_2 = 2 * feature_maps[1] 
-        self.num_outputs = num_classes
+        self.num_inputs = J*feature_maps[0]
+        self.num_inputs_2 = 2 * feature_maps[1]
+        self.num_outputs = n_classes
         self.fcx2x_1 = nn.Linear(self.num_inputs, self.num_outputs)
         self.fcy2x_1 = nn.Linear(self.num_inputs_2, self.num_outputs)
 
@@ -158,28 +146,28 @@ class gnn_atomic_lg_final(nn.Module):
 
 
 class lGNN_multiclass(nn.Module):
-    def __init__(self, num_features, num_layers, J, num_classes=2):
+    def __init__(self, num_features, num_layers, J, n_classes=2):
         super(lGNN_multiclass, self).__init__()
         self.num_features = num_features
         self.num_layers = num_layers
-        self.num_classes = num_classes
-        self.featuremap_in = [1, 1, num_features]
-        self.featuremap_mi = [num_features, num_features, num_features]
-        self.featuremap_end = [num_features, num_features, num_features]
+        self.featuremap_in = [1, 1, num_features // 2]
+        self.featuremap_mi = [num_features, num_features, num_features // 2]
+        self.featuremap_end = [num_features, num_features, 1]
         # self.layer0 = Gconv(self.featuremap_in, J)
         self.layer0 = gnn_atomic_lg(self.featuremap_in, J)
         for i in range(num_layers):
             # module = Gconv(self.featuremap_mi, J)
             module = gnn_atomic_lg(self.featuremap_mi, J)
             self.add_module('layer{}'.format(i + 1), module)
-        self.layerlast = gnn_atomic_lg_final(self.featuremap_end, J, num_classes)
+        self.layerlast = gnn_atomic_lg_final(self.featuremap_end, J, n_classes)
 
     def forward(self, W, x, W_lg, y, P):
         cur = self.layer0(W, x, W_lg, y, P)
         for i in range(self.num_layers):
-            cur = self._modules['layer{}'.format(i + 1)](*cur)
+            # print ('layer', i)
+            cur = self._modules['layer{}'.format(i+1)](*cur)
         out = self.layerlast(*cur)
-        return out[1]  # out[0] = W in gnn_atomic_lg_final
+        return out[1]
 
 
 if __name__ == '__main__':

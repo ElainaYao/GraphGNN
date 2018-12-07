@@ -92,7 +92,7 @@ class Generator(object):
         W = W.type(self.dtype)
         n = W.shape[0]
         W = W * (torch.ones([n, n]).type(self.dtype) - torch.eye(n).type(self.dtype))
-        M = int(W.sum())
+        M = int(W.sum()) // 2
         p = 0
         Pm = torch.zeros([n, M * 2]).type(self.dtype)
         for i in range(n):
@@ -110,7 +110,7 @@ class Generator(object):
         W = W.type(self.dtype)
         n = W.shape[0]
         W = W * (torch.ones([n, n]).type(self.dtype) - torch.eye(n).type(self.dtype))
-        M = int(W.sum())
+        M = int(W.sum()) // 2
         p = 0
         Pd = torch.zeros([n, M * 2]).type(self.dtype)
         for i in range(n):
@@ -124,18 +124,20 @@ class Generator(object):
         Pd = Pd.type(self.dtype)
         return Pd
 
+    def get_NB_2(self, W):
+        Pm = self.get_Pm(W)
+        Pd = self.get_Pd(W)
+        Pf = (Pm + Pd) / 2
+        Pt = (Pm - Pd) / 2
+        NB = torch.mm(torch.transpose(Pt,0,1),Pf) * (1-torch.mm(torch.transpose(Pf,0,1),Pt))
+        return NB
+
 
     def get_P(self, W):
         W = W.type(self.dtype)
         P = torch.stack((self.get_Pm(W), self.get_Pd(W)), dim = -1)
         P = P.type(self.dtype)
         return P
-
-    def get_W_lg(self, W):
-        W = W.type(self.dtype)
-        W_lg = torch.mm(torch.t(self.get_Pm(W)), self.get_Pd(W))
-        W_lg = W_lg.type(self.dtype)
-        return W_lg
     
     def compute_sample_i(self):
         sample_i = {}
@@ -148,7 +150,7 @@ class Generator(object):
                              .format(self.generative_model))
 
         WW, x = self.get_operators(W)
-        W_lg = self.get_W_lg(W)
+        W_lg = self.get_NB_2(W)
         WW_lg, y = self.get_operators(W_lg)
         P = self.get_P(W)
 
