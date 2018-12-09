@@ -26,10 +26,10 @@ import torch.nn.functional as F
 from loss import compute_loss_rlx, compute_loss_acc, compute_loss_policy
 import pandas
 
-template1 = '{:<10} {:<15} {:<10} {:<10} {:<15} {:<10} {:<10} '
-template2 = '{:<10} {:<15.4g} {:<10.3f} {:<10} {:<15.4g} {:<10} {:<10.3f} \n'
-template3 = '{:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} '
-template4 = '{:<10} {:<10} {:<10.2f} {:<10} {:<10.3f} {:<10.1f} {:<10} {:<10.3f} \n'
+template1 = '{:<10} {:<15} {:<10} {:<10} {:<10} {:<15} {:<15} {:<10} '
+template2 = '{:<10} {:<15.4g} {:<10.3f} {:<10.4f} {:<10} {:<15.4g} {:<15} {:<10.3f} \n'
+template3 = '{:<10} {:<10} {:<10} {:<10} {:<15} {:<15} {:<10} '
+template4 = '{:<10} {:<10.3f} {:<10.4f} {:<10} {:<15.4g} {:<15} {:<10.3f} \n'
 template5 = '{:<10} {:<10} {:<10} {:<10} {:<10} {:<11} {:<10} {:<10} {:<10} '
 template6 = '{:<10} {:<10} {:<10.2f} {:<10} {:<10.3f} {:<11.12} {:<10.1f} {:<10} {:<10.3f} \n'
 
@@ -46,10 +46,9 @@ def train_single(gnn, optimizer, logger, gen, Lambda, it, args):
     del P
     if args.loss_method == 'relaxation':
         loss = compute_loss_rlx(pred, args, L, Lambda)
-        acc, inb = compute_loss_acc(pred, args, L) 
-
+        acc, z, inb = compute_loss_acc(pred, args, L) 
     elif args.loss_method == 'policy':
-        loss, acc, inb = compute_loss_policy(pred, args, L, Lambda)
+        loss, acc, z, inb = compute_loss_policy(pred, args, L, Lambda)
     del L
     gnn.zero_grad()
     loss.backward()
@@ -63,17 +62,19 @@ def train_single(gnn, optimizer, logger, gen, Lambda, it, args):
     if(torch.cuda.is_available()):
         loss_value = float(loss.data.cpu().numpy())
         acc_value = float(acc.data.cpu().numpy())
+        z_value = float(z.data.cpu().numpy())
+        inb_value = float(inb.data.cpu().numpy())
     else:
         loss_value = float(loss.data.numpy())
         acc_value = float(acc.data.numpy())
+        z_value = float(z.data.numpy())
+        inb_value = float(inb.data.numpy())
     
-    info = ['epoch', 'avg loss', 'avg acc', 'avg inb', 'Lambda', 'edge_den', 'elapsed']
-    out = [it, loss_value, acc_value, abs(inb), Lambda, args.edge_density, elapsed]
+    info = ['epoch', 'avg loss', 'avg acc', 'avg nacc', 'avg inb', 'Lambda', '(avg)degree', 'elapsed']
+    out = [it, loss_value, acc_value, z_value, inb_value, Lambda, int(args.edge_density*args.num_nodes), elapsed]
     print(template1.format(*info))
     print(template2.format(*out))
-
-
-    return loss_value, acc_value, inb
+    return loss_value, acc_value, z_value, inb_value
 
 def train(gnn, logger, gen, args, iters=None):
     if iters is None:
@@ -82,28 +83,49 @@ def train(gnn, logger, gen, args, iters=None):
     optimizer = torch.optim.Adamax(gnn.parameters(), lr = args.lr)
     loss_lst = np.zeros([iters])
     acc_lst = np.zeros([iters])
+    z_lst = np.zeros([iters])
     inb_lst = np.zeros([iters])
-    lastIDX = iters
+    #lastIDX = iters
     for it in range(iters):
-        Lambda = args.Lambda * pow((1 + args.LambdaIncRate),it)
-        loss_single, acc_single, inb_single = train_single(gnn, optimizer, logger, gen, Lambda, it, args)
+        if args.problem0 == 'Bisection':
+            Lambda = args.Lambda * pow((1 + args.LambdaIncRate),it)
+        elif args.problem0 == 'Cut':
+            Lambda = 0
+        else:
+            raise ValueError('problem0 {} not supported'
+                             .format(args.problem0))
+        loss_single, acc_single, z_single, inb_single = train_single(gnn, optimizer, logger, gen, Lambda, it, args)
         loss_lst[it] = loss_single
         acc_lst[it] = acc_single
+        z_lst[it] = z_single 
         inb_lst[it] = inb_single
         torch.cuda.empty_cache()
-        if it > 100 and np.sum(inb_lst[(it-10):it]) < 18:
-            lastIDX = it
-            break
-    loss_lst = loss_lst[0:lastIDX]
-    acc_lst = acc_lst[0:lastIDX]
-    inb_lst = inb_lst[0:lastIDX]
-    print ('Avg train loss', np.mean(loss_lst[-10:]))
-    print ('Avg train acc', np.mean(acc_lst[-10:]))
-    print ('Avg train inbalance', np.mean(inb_lst[-10:]))
-    return loss_lst, acc_lst, inb_lst, lastIDX
+        #if it > 100 and np.sum(inb_lst[(it-20):it]) < 38:
+        #    lastIDX = it
+        #    break
+        if (it % 100 == 0) and (it >= 100):
+            # print ('Testing at check_pt begins')
+            print ('Check_pt at iteration ' + str(it) + ' :')
+            # test(gnn, logger, gen, args.n_classes, iters = 20)
+            print ('Avg train loss', np.mean(loss_lst[it-100:it]))
+            print ('Avg train acc', np.mean(acc_lst[it-100:it]))
+            print ('Std train acc', np.std(acc_lst[it-100:it]))
+            print ('Avg train nacc', np.mean(z_lst[-100:]))
+            print ('Avg train inbalance', np.mean(inb_lst[-100:]))   
+    #loss_lst = loss_lst[0:lastIDX]
+    #acc_lst = acc_lst[0:lastIDX]
+    #z_lst = z_lst[0:lastIDX]
+    #inb_lst = inb_lst[0:lastIDX]
+    print ('Final avg train loss', np.mean(loss_lst))
+    print ('Final avg train acc', np.mean(acc_lst))
+    print ('Final avg train nacc', np.mean(z_lst))
+    print ('Final std train acc', np.std(acc_lst))
+    print ('Final avg train inbalance', np.mean(inb_lst))
+    #return loss_lst, acc_lst, z_lst, inb_lst, lastIDX
 
 def test_single(gnn, logger, gen, it, args):
     start = time.time()
+    random.seed(it)
     WW, x, WW_lg, y, P = gen.sample_batch()
     pred = gnn(WW, x, WW_lg, y, P)
     L = WW[:,:,:,1] - WW[:,:,:,2]
@@ -112,37 +134,52 @@ def test_single(gnn, logger, gen, it, args):
     del x
     del y
     del P
-    acc, inb = compute_loss_acc(pred, args, L) 
+    if args.loss_method == 'relaxation':
+        acc, z, inb = compute_loss_acc(pred, args, L) 
+    elif args.loss_method == 'policy':
+        Lambda = 0 
+        loss, acc, z, inb = compute_loss_policy(pred, args, L, Lambda)
+    del L
     elapsed = time.time() - start
-
-    if(torch.cuda.is_available()):
+    if (torch.cuda.is_available()):
+        loss_value = float(loss.data.cpu().numpy())
         acc_value = float(acc.data.cpu().numpy())
+        z_value = float(z.data.cpu().numpy())
+        inb_value = float(inb.data.cpu().numpy())
     else:
+        loss_value = float(loss.data.numpy())
         acc_value = float(acc.data.numpy())
+        z_value = float(z.data.numpy())
+        inb_value = float(inb.data.numpy())
 
-    info = ['epoch', 'mode', 'avg acc', 'avg inb', 'Lambda', 'edge_den', 'elapsed']
-    out = [it, 'test', acc_value, inb, args.Lambda, args.edge_density, elapsed]
-    print(template1.format(*info))
-    print(template2.format(*out))
+    info = ['epoch', 'avg loss', 'avg acc', 'avg nacc', 'avg inb', '(avg)degree', 'elapsed']
+    out = [it, loss_value, acc_value, z_value, inb_value, int(args.edge_density*args.num_nodes), elapsed]
+    print(template3.format(*info))
+    print(template4.format(*out))
+    return loss_value, acc_value, z_value, inb_value
 
-    return acc_value, inb
-
-def test(gnn, logger, W_all, args, iters = None):
+def test(gnn, logger, gen, args, iters=None):
     if iters is None:
-        iters = args.num_examples_test
-        
+        iters = args.num_examples_train
     gnn.train()
+    loss_lst = np.zeros([iters])
     acc_lst = np.zeros([iters])
+    z_lst = np.zeros([iters])
     inb_lst = np.zeros([iters])
     for it in range(iters):
-        W = W_all[it, :, :]
-        acc_single, inb_single = test_single(gnn, logger, W, it, args)
+        loss_single, acc_single, z_single, inb_single = test_single(gnn, logger, gen, it, args)
+        loss_lst[it] = loss_single
         acc_lst[it] = acc_single
+        z_lst[it] = z_single
         inb_lst[it] = inb_single
         torch.cuda.empty_cache()
+    print ('Testing results:')
+    print ('Avg test loss', np.mean(loss_lst))
     print ('Avg test acc', np.mean(acc_lst))
-    print ('Avg test inb', np.mean(inb_lst))
-    return acc_lst, inb_lst
+    print ('Std test acc', np.std(acc_lst))
+    print ('Avg test nacc', np.mean(z_lst))
+    print ('Avg test inbalance', np.mean(inb_lst))
+    return loss_lst, acc_lst, z_lst, inb_lst
 
 def read_args_commandline():
     parser = argparse.ArgumentParser()
@@ -222,7 +259,7 @@ def main():
             if torch.cuda.is_available():
                 gnn.cuda()
             print ('Testing begins')
-            acc, inb = test(gnn, logger, W_all, args, iters = None)
+            loss, acc, z, inb = test(gnn, logger, W_all, args, iters = None)
             print('Saving the testing results')
             res = {
                 'acc': acc,
@@ -243,38 +280,38 @@ def main():
     elif (args.mode == 'train'):           
         print ('Creating the gnn ...')
         if args.loss_method == 'policy':
-            filename = 'lgnn_' + str(args.problem) + '_plc' + str(args.num_ysampling) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
+            filename = 'lgnn_' + str(args.problem) + str(args.problem0) + '_plc' + str(args.num_ysampling) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
         else:
-            filename = 'lgnn_' + str(args.problem) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
+            filename = 'lgnn_' + str(args.problem) + str(args.problem0) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr)
 
         path_plus_name = os.path.join(args.path_gnn, filename)
         gnn = lGNN_multiclass(args.num_features, args.num_layers, args.J + 2, args.num_classes)
     
         if torch.cuda.is_available():
-                gnn.cuda()
-
+            gnn.cuda()
         print ('Training begins')
-        loss, acc, inb, lastIDX = train(gnn, logger, gen, args, iters = None)
+        train(gnn, logger, gen, args, iters = None)
         print ('Saving gnn ' + filename)
         if torch.cuda.is_available():
             torch.save(gnn.cpu(), path_plus_name)
             gnn.cuda()
         else:
             torch.save(gnn, path_plus_name)
-        res = {
-            'loss': loss,
-            'acc': acc,
-            'inb': inb,
-            'lastIDX': lastIDX
-        }
-        if args.loss_method == 'policy':
-            resname = 'segm_' + str(args.problem) + '_plc' + str(args.num_ysampling) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
-        else:
-            resname = 'segm_' + str(args.problem) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
-        path_plus_name = os.path.join(args.path_output, resname)
-        print ('Saving loss, acc, inb, lastIDX...' + resname)
-        with open(path_plus_name, 'wb') as f:
-            pickle.dump(res, f, pickle.HIGHEST_PROTOCOL)
+        #res = {
+        #    'loss': loss,
+        #    'acc': acc,
+        #    'nacc': z,
+        #    'inb': inb,
+        #    'lastIDX': lastIDX
+        #}
+        #if args.loss_method == 'policy':
+        #    resname = 'segm_' + str(args.problem) + str(args.problem0) + '_plc' + str(args.num_ysampling) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
+        #else:
+        #    resname = 'segm_' + str(args.problem) + str(args.problem0) + '_N' + str(args.num_nodes) + '_p' + str(args.edge_density) + '_J' + str(args.J) + '_lyr' + str(args.num_layers) + '_ftr' + str(args.num_features) + '_Lbd' + str(args.Lambda) + '_LbdR' + str(args.LambdaIncRate) + '_lr' + str(args.lr) + '.pickle'
+        #path_plus_name = os.path.join(args.path_output, resname)
+        #print ('Saving loss, acc, nacc, inb, lastIDX...' + resname)
+        #with open(path_plus_name, 'wb') as f:
+        #    pickle.dump(res, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     main()

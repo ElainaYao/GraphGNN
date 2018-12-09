@@ -18,14 +18,14 @@ python main.py \
 --path_output '/home/wy635/Graph/GraphGNN/myfile/temp_2/output/' \
 --filename_existing_gnn '' \
 --generative_model 'RegularGraph' \
+--num_examples_train 5000 \
+--num_examples_test 1000 \
+--num_ysampling 10000 \
+--loss_method 'relaxation' \
 --problem 'max' \
 --problem0 'Cut' \
---num_examples_train 1000 \
---num_examples_test 1000 \
---num_ysampling 10 \
---loss_method 'relaxation' \
 --num_nodes 50 \
---edge_density 0.5 \
+--edge_density 0.06 \
 --Lambda 10 \
 --LambdaIncRate 0.05 \
 --batch_size 1 \
@@ -41,19 +41,19 @@ python main.py \
 
 
 python3 main.py \
---path_logger '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/' \
---path_gnn '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/' \
---path_output '/Users/Rebecca_yao/Documents/RESEARCH/Graph/GraphGNN/myfile/temp_2/output/' \
+--path_logger '/Users/Rebecca_yao/Dropbox/RESEARCH/Graph/GraphGNN/myfile/temp/' \
+--path_gnn '/Users/Rebecca_yao/Dropbox/RESEARCH/Graph/GraphGNN/myfile/temp/output/' \
+--path_output '/Users/Rebecca_yao/Dropbox/RESEARCH/Graph/GraphGNN/myfile/temp/output/' \
 --filename_existing_gnn '' \
---generative_model 'ErdosRenyi' \
---num_examples_train 1000 \
+--generative_model 'RegularGraph' \
+--num_examples_train 5000 \
 --num_examples_test 1000 \
 --num_ysampling 10000 \
 --loss_method 'relaxation' \
 --problem 'max' \
 --problem0 'Cut' \
 --num_nodes 50 \
---edge_density 0.5 \
+--edge_density 0.06 \
 --Lambda 10 \
 --LambdaIncRate 0.05 \
 --batch_size 1 \

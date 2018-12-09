@@ -33,7 +33,7 @@ class Generator(object):
             self.J = 3
             self.generative_model = "ErdosRenyi"
             self.bs = 1
-            self.path_output = '/home/jss2/wy635/Graph/GraphGNN/myfile/temp_2/output/'
+            self.path_output = '/home/jss2/wy635/Graph/GraphGNN/myfile/temp/output/'
         else:
             self.p = args.edge_density
             self.N = args.num_nodes
@@ -204,8 +204,8 @@ if __name__ == '__main__':
     gen = Generator()
     WW, x, WW_lg, y, P = gen.sample_batch()
     L = WW[:,:,:,1] - WW[:,:,:,2]
-    L = L.numpy()
     resname = 'testdata_' + str(gen.generative_model) + '_N' + str(gen.N) + '_p' + str(gen.p) + '_num' + str(gen.bs)
     path_plus_name = os.path.join(gen.path_output, resname)
+
 
            

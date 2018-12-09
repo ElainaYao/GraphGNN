@@ -34,31 +34,26 @@ def compute_loss_rlx(pred, args, L, Lambda):
     pp = pred_prob[:, :, 0] # pp of size bs x N
     yy = 2*pp-1
     c = 1/4 * torch.bmm(yy.unsqueeze(-2), torch.bmm(L, yy.unsqueeze(-1))) 
-    if args.problem0 == 'Bisection':
-        if args.problem == 'max':
-            loss = torch.mean(- c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
-        else:
-            loss = torch.mean(c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
-    elif args.problem0 == 'Cut':
-        if args.problem == 'max':
-            loss = torch.mean(- c.view([args.batch_size]))
-        else:
-            loss = torch.mean(c.view([args.batch_size]))
+
+    if args.problem == 'max':
+        loss = torch.mean(- c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
     else:
-        raise ValueError('problem0 {} not supported'
-                             .format(args.problem0))
+        loss = torch.mean(c.view([args.batch_size]) + Lambda * (pp.sum(dim = -1) - args.num_nodes/2).pow(2))
     return loss
 
 def compute_loss_acc(pred, args, L):  
     L = L.type(dtype)
+    d = int(args.num_nodes * args.edge_density)
     labels = torch.argmax(pred, dim = -1).type(dtype) * 2 - 1 # of size bs x N
     acc = torch.mean(1/4 * torch.bmm(labels.unsqueeze(-2), torch.bmm(L, labels.unsqueeze(-1))))
-    inb = torch.mean(torch.abs(labels.sum(dim = -1)))
-    return acc, inb
+    z = (acc/args.num_nodes - d/4)/np.sqrt(d/4)
+    inb = torch.abs(torch.mean(torch.abs(labels.sum(dim = -1))))
+    return acc, z, inb
 
 def compute_loss_policy(pred, args, L, Lambda): 
     L = L.type(dtype)
     pred_prob = softmax(pred).type(dtype)  # pred of size bs x N x 2
+    d = int(args.num_nodes * args.edge_density)
     if args.batch_size == 1:
         m = Categorical(pred_prob[0,:,:])
         y_sampled = m.sample((args.num_ysampling,)).type(dtype)
@@ -74,22 +69,14 @@ def compute_loss_policy(pred, args, L, Lambda):
         c = torch.mm(y_sampled_label, torch.mm(L, torch.t(y_sampled_label)))
         c = 1/4 * torch.diagonal(c, offset = 0) 
         # c of size args.num_ysampling
-        if args.problem0 == 'Bisection':
-            if args.problem == 'max':
-                c_plus_penalty = - c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
-            else:
-                c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
-        elif args.problem0 == 'Cut':
-            if args.problem == 'max':
-                c_plus_penalty = - c
-            else:
-                c_plus_penalty = c
+        if args.problem == 'max':
+            c_plus_penalty = - c + Lambda * y_sampled_label.sum(dim = 1).pow(2)
         else:
-            raise ValueError('problem0 {} not supported'
-                             .format(args.problem0))
+            c_plus_penalty = c + Lambda * y_sampled_label.sum(dim = 1).pow(2)             
         loss = pred_prob_sampled_sum_log.dot(c_plus_penalty)
         w = torch.exp(pred_prob_sampled_sum_log)/torch.exp(pred_prob_sampled_sum_log).sum(dim = -1)
         acc = w.dot(c)
+        z = (acc/args.num_nodes - d/4)/np.sqrt(d/4)
         inb = torch.dot(torch.abs(y_sampled_label.sum(dim = 1)), w)
     else:
         m = Categorical(pred_prob)
@@ -114,9 +101,10 @@ def compute_loss_policy(pred, args, L, Lambda):
         acc = torch.dot(c.view([args.batch_size, 1, args.num_ysampling]), w.view([args.batch_size, args.num_ysampling, 1]))
         inb = torch.dot(torch.abs(y_sampled_label.sum(dim=1)).view([args.batch_size, 1, args.num_ysampling]), w.view([args.batch_size, args.num_ysampling, 1]))
         acc = torch.mean(acc)
+        z = (acc/args.num_nodes - d/4)/np.sqrt(d/4)
         inb = torch.mean(inb)
     inb = torch.round(inb)
-    return loss, acc, inb
+    return loss, acc, z, inb
 
 
 

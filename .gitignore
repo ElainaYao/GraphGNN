@@ -1,7 +1,7 @@
 # Don't track content of these folders
 littlethinking/
 __pycache__/
-
+output/
 # Compiled source #
 ###################
 *.pickle

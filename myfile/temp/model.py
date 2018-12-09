@@ -21,14 +21,14 @@ if torch.cuda.is_available():
     dtype = torch.cuda.FloatTensor
     dtype_l = torch.cuda.LongTensor
 else:
-    dtype = torch.FloatTensor                      
+    dtype = torch.FloatTensor                      # why FloatTensor??
     dtype_l = torch.cuda.LongTensor
 
 ######## need to go back and write my own 
 def GMul(W, x):
     # x is a tensor of size (bs, N, num_features)
     # W is a tensor of size (bs, N, N, J)
-    # x_size = x.size()
+    x_size = x.size()
     # print (x)
     W_size = W.size()
     N = W_size[-3]
